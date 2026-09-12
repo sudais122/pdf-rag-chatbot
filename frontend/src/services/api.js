@@ -7,12 +7,17 @@
 import { mockUploadPdf, mockGetDocumentStatus, mockAskQuestion } from './mockApi.js';
 
 // --------------------------------------------------------------
-// Flip this to false once your backend is running and reachable
-// at VITE_API_URL. See the README for details.
+// Flip this back to true if you ever want to demo the UI without
+// the Node/Python backend running.
 // --------------------------------------------------------------
-export const MOCK_MODE = true;
+export const MOCK_MODE = false;
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Left empty by default so requests go to a relative path (e.g. /api/chat),
+// which Vite's dev server proxy (see vite.config.js) forwards to the Node
+// backend same-origin — this avoids CORS entirely during development.
+// Set VITE_API_URL only for production builds, where there's no Vite dev
+// proxy and the frontend needs the backend's real, absolute URL.
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 class ApiError extends Error {
   constructor(message, status) {
@@ -97,15 +102,24 @@ export async function getDocumentStatus(documentId) {
   return request(`/api/pdf/${documentId}/status`, { method: 'GET' });
 }
 
-/** Ask a question about a processed document. Returns { answer, sources }. */
+/**
+ * Ask a question about the processed document. Returns whatever the
+ * Python RAG API's /ask endpoint sends back, proxied through Node's
+ * /api/chat route unchanged. documentId is accepted for future use
+ * (e.g. once the backend supports multiple documents) but the current
+ * /api/chat route ignores it — only { question } is sent.
+ *
+ * If your Python /ask response isn't shaped like { answer, sources },
+ * update ChatMessage.jsx / SourceCard.jsx to match the real shape.
+ */
 export async function askQuestion(question, documentId) {
   if (MOCK_MODE) {
     return mockAskQuestion(question, documentId);
   }
-  return request('/api/chat/ask', {
+  return request('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, documentId })
+    body: JSON.stringify({ question })
   });
 }
 
